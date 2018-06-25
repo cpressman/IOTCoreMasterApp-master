@@ -68,6 +68,8 @@ namespace BackgroundApplicationDebug
 
             _deferral = taskInstance.GetDeferral();
 
+			await Task.Delay(30000);
+
 			bs = new RateSensor();
 			bs.RateSensorInit();
 
@@ -126,24 +128,16 @@ namespace BackgroundApplicationDebug
         {
             device = args;
 
-            //var services = await device.GetGattServicesAsync();
-
-            //foreach (var service in services.Services)
-            //{
-            //    Debug.WriteLine($"Service: {service.Uuid}");
-
-            //    var characteristics = await service.GetCharacteristicsAsync();
-
-            //    foreach (var character in characteristics.Characteristics)
-            //    {
-            //        Debug.WriteLine($"Characteristic: {character.Uuid}");
-            //    }
-            //}
+            Debug.WriteLine("Device Added");
         }
 
         private async Task UpdateAllData()
         {
-            if (device == null) return;
+            if (device == null)
+            {
+                Debug.WriteLine("Device NULL");
+                return;
+            }
             BluetoothLEDevice BLEdevice = await BluetoothLEDevice.FromIdAsync(device.Id);
             GattDeviceServicesResult result = await BLEdevice.GetGattServicesAsync();
 
@@ -187,28 +181,27 @@ namespace BackgroundApplicationDebug
                             }
                         }
 
-
                     }
-
+                    service.Dispose();
                 }
-                BLEdevice.Dispose(); 
-
             }
-
+            Debug.WriteLine("Device Watcher Stopped");
+            deviceWatcher.Stop();
+            BLEdevice.Dispose();
+            BLEdevice = null;
+            GC.Collect();
+            Debug.WriteLine("Garbage Collected");
             return;
         }
-
             private async void Timer_Tick(ThreadPoolTimer timer)
         {
-            Debug.WriteLine("tick" + Environment.TickCount);
-
-            await UpdateBatteryInfo();
-            this.timer = ThreadPoolTimer.CreateTimer(Timer_Tick, TimeSpan.FromSeconds(10));
-        }
-
-        private async Task UpdateBatteryInfo()
-        {
+            if (deviceWatcher.Status == DeviceWatcherStatus.Stopped)
+            {
+                deviceWatcher.Start();
+                Debug.WriteLine("Device Watcher Restarted");
+            }
             await UpdateAllData();
+            this.timer = ThreadPoolTimer.CreateTimer(Timer_Tick, TimeSpan.FromSeconds(10));
         }
 
         private async Task<BatteryReport> GetBatteryStatus()
